@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: reading-room-library
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+        # Paste the Neon PostgreSQL connection string in the Render dashboard.
+      - key: NODE_ENV
+        value: production
