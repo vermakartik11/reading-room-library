@@ -53,6 +53,6 @@ app.post('/api/register', async (req,res)=>{
   catch(e){ if(e.code==='23505')return res.status(409).json({error:'Email already registered'}); console.error(e);res.status(500).json({error:'Could not create account'}); }
 });
 
-app.get('/api/health', (_req,res)=>res.json({ok:true}));
+app.get('/api/health', async (_req,res)=>{try{await pool.query('SELECT 1');res.json({ok:true,database:'connected'});}catch(e){console.error('Health check database query failed:',e.message);res.status(503).json({ok:false,database:'unavailable'});}});
 const port=process.env.PORT||3000;
 app.listen(port,()=>console.log(`Library server listening on http://localhost:${port}`));
