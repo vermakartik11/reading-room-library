@@ -9,5 +9,8 @@ services:
       - key: DATABASE_URL
         sync: false
         # Paste the Neon PostgreSQL connection string in the Render dashboard.
+      - key: LIBRARIAN_SIGNUP_CODE
+        sync: false
+        # Private code required to register librarian accounts.
       - key: NODE_ENV
         value: production

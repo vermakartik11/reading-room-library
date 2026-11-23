@@ -47,9 +47,16 @@ app.delete('/api/loans/:bookId',requireUser,async(req,res)=>{try{const result=aw
 app.post('/api/books',requireUser,requireRole('librarian'),async(req,res)=>{const {title,author,genre,copies}=req.body;if(!title||!author||!genre||!Number.isInteger(copies)||copies<1||copies>50)return res.status(400).json({error:'Invalid book details'});const c=await pool.connect();try{await c.query('BEGIN');const g=await c.query('INSERT INTO genres(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id',[genre]);const b=await c.query('INSERT INTO books(title,genre_id) VALUES($1,$2) RETURNING id',[title,g.rows[0].id]);const a=await c.query('INSERT INTO authors(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id',[author]);await c.query('INSERT INTO book_authors(book_id,author_id) VALUES($1,$2)',[b.rows[0].id,a.rows[0].id]);for(let i=0;i<copies;i++)await c.query('INSERT INTO book_copies(book_id,barcode) VALUES($1,$2)',[b.rows[0].id,`R-${b.rows[0].id}-${i+1}`]);await c.query('COMMIT');res.status(201).json({ok:true});}catch(e){await c.query('ROLLBACK');console.error(e);res.status(500).json({error:'Could not add book'});}finally{c.release();}});
 
 app.post('/api/register', async (req,res)=>{
-  const {email,password,fullName}=req.body;
+  const {email,password,fullName,role='student',librarianCode}=req.body;
   if(!email||!password||!fullName||password.length<8) return res.status(400).json({error:'Enter your name, email, and a password of at least 8 characters'});
-  try { const {rows}=await pool.query(`INSERT INTO library_users(email,password_hash,full_name,role) VALUES($1,crypt($2,gen_salt('bf')), $3,'student') RETURNING id,email,full_name,role`,[email,password,fullName]); res.status(201).json({user:rows[0]}); }
+  if(!['student','librarian'].includes(role)) return res.status(400).json({error:'Choose a valid account type'});
+  if(role==='librarian'){
+    const expected=process.env.LIBRARIAN_SIGNUP_CODE||'';
+    const supplied=typeof librarianCode==='string'?librarianCode:'';
+    const expectedBytes=Buffer.from(expected);const suppliedBytes=Buffer.from(supplied);
+    if(!expected||expectedBytes.length!==suppliedBytes.length||!crypto.timingSafeEqual(expectedBytes.length===suppliedBytes.length?expectedBytes:Buffer.alloc(0),expectedBytes.length===suppliedBytes.length?suppliedBytes:Buffer.alloc(0))) return res.status(403).json({error:'A valid library signup code is required to create a librarian account'});
+  }
+  try { const {rows}=await pool.query(`INSERT INTO library_users(email,password_hash,full_name,role) VALUES($1,crypt($2,gen_salt('bf')), $3,$4) RETURNING id,email,full_name,role`,[email,password,fullName,role]); res.status(201).json({user:rows[0]}); }
   catch(e){ if(e.code==='23505')return res.status(409).json({error:'Email already registered'}); console.error(e);res.status(500).json({error:'Could not create account'}); }
 });
 
